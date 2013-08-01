@@ -100,7 +100,6 @@ cmd_start() {
 	require_tag_absent "$VERSION_NAME-start"
 	require_tag_absent "$VERSION_NAME"
 
-	git_do tag -a "$VERSION_NAME-start" -m "Starting release $VERSION_NAME"
 
 	if flag fetch; then
 		git_do fetch -q "$ORIGIN" "$DEVELOP_BRANCH"
@@ -110,7 +109,14 @@ cmd_start() {
 	fi
 
 	# create branch
-	git_do checkout -b "$BRANCH" "$BASE"
+	if git_branch_exists "$BRANCH"; then
+	    git_do checkout "$BRANCH"
+	    git_do merge --no-ff "$ORIGIN/$DEVELOP_BRANCH"
+	else
+	    git_do checkout -b "$BRANCH" "$BASE"
+	fi
+
+	git_do tag -a "$VERSION_NAME-start" -m "Starting release $VERSION_NAME"
 
 	echo
 	echo "Summary of actions:"
