@@ -45,8 +45,7 @@ init() {
 }
 
 usage() {
-	echo "usage: git flow release [list] [-v]"
-	echo "       git flow release start [-F] <version> [<base>]"
+	echo "usage: git flow release start [-F] <version> [<base>]"
 	echo "       git flow release finish [-FsumpkS] <version>"
 	echo "       git flow release publish <name>"
 	echo "       git flow release track <name>"
@@ -54,62 +53,6 @@ usage() {
 
 cmd_default() {
 	cmd_list "$@"
-}
-
-cmd_list() {
-	DEFINE_boolean verbose false 'verbose (more) output' v
-	parse_args "$@"
-
-	local release_branches
-	local current_branch
-	local short_names
-	release_branches=$(echo "$(git_local_branches)" | grep "^$PREFIX")
-	if [ -z "$release_branches" ]; then
-		warn "No release branches exist."
-                warn ""
-                warn "You can start a new release branch:"
-                warn ""
-                warn "    git flow release start <name> [<base>]"
-                warn ""
-		exit 0
-	fi
-
-	current_branch=$(git branch --no-color | grep '^\* ' | grep -v 'no branch' | sed 's/^* //g')
-	short_names=$(echo "$release_branches" | sed "s ^$PREFIX  g")
-
-	# determine column width first
-	local width=0
-	local branch
-	for branch in $short_names; do
-		local len=${#branch}
-		width=$(max $width $len)
-	done
-	width=$(($width+3))
-
-	local branch
-	for branch in $short_names; do
-		local fullname=$PREFIX$branch
-		local base=$(git merge-base "$fullname" "$DEVELOP_BRANCH")
-		local develop_sha=$(git rev-parse "$DEVELOP_BRANCH")
-		local branch_sha=$(git rev-parse "$fullname")
-		if [ "$fullname" = "$current_branch" ]; then
-			printf "* "
-		else
-			printf "  "
-		fi
-		if flag verbose; then
-			printf "%-${width}s" "$branch"
-			if [ "$branch_sha" = "$develop_sha" ]; then
-				printf "(no commits yet)"
-			else
-				local nicename=$(git rev-parse --short "$base")
-				printf "(based on $nicename)"
-			fi
-		else
-			printf "%s" "$branch"
-		fi
-		echo
-	done
 }
 
 cmd_help() {
@@ -124,7 +67,7 @@ parse_args() {
 
 	# read arguments into global variables
 	VERSION=$1
-	BRANCH=$PREFIX$VERSION
+	BRANCH="release"
 }
 
 require_version_arg() {
@@ -143,26 +86,22 @@ require_base_is_on_develop() {
 	fi
 }
 
-require_no_existing_release_branches() {
-	local release_branches=$(echo "$(git_local_branches)" | grep "^$PREFIX")
-	local first_branch=$(echo ${release_branches} | head -n1)
-	first_branch=${first_branch#$PREFIX}
-	[ -z "$release_branches" ] || \
-		die "There is an existing release branch ($first_branch). Finish that one first."
-}
-
 cmd_start() {
-	DEFINE_boolean fetch false "fetch from $ORIGIN before performing finish" F
+	DEFINE_boolean fetch true "fetch from $ORIGIN before performing start" F
 	parse_args "$@"
 	BASE=${2:-$DEVELOP_BRANCH}
 	require_version_arg
 	require_base_is_on_develop
-	require_no_existing_release_branches
 
 	# sanity checks
 	require_clean_working_tree
-	require_branch_absent "$BRANCH"
-	require_tag_absent "$VERSION_PREFIX$VERSION"
+
+	VERSION_NAME="$VERSION_PREFIX$VERSION"
+	require_tag_absent "$VERSION_NAME-start"
+	require_tag_absent "$VERSION_NAME"
+
+	git_do tag -a "$VERSION_NAME-start" -m "Starting release $VERSION_NAME"
+
 	if flag fetch; then
 		git_do fetch -q "$ORIGIN" "$DEVELOP_BRANCH"
 	fi
@@ -171,11 +110,12 @@ cmd_start() {
 	fi
 
 	# create branch
-	git_do checkout -b "$BRANCH" "$BASE"
+	git_do checkout -B "$BRANCH" "$BASE"
 
 	echo
 	echo "Summary of actions:"
-	echo "- A new branch '$BRANCH' was created, based on '$BASE'"
+	echo "- '$BRANCH' was created / updated from '$BASE'"
+	echo "- A tag '$VERSION_NAME-start' was created"
 	echo "- You are now on branch '$BRANCH'"
 	echo
 	echo "Follow-up actions:"
@@ -193,9 +133,7 @@ cmd_finish() {
 	DEFINE_string signingkey "" "use the given GPG-key for the digital signature (implies -s)" u
 	DEFINE_string message "" "use the given tag message" m
 	DEFINE_string messagefile "" "use the contents of the given file as a tag message" f
-	DEFINE_boolean push false "push to $ORIGIN after performing finish" p
-	DEFINE_boolean keep false "keep branch after performing finish" k
-	DEFINE_boolean notag false "don't tag this release" n
+	DEFINE_boolean push true "push to $ORIGIN after performing finish" p
 	DEFINE_boolean squash false "squash release during merge" S
 
 	parse_args "$@"
@@ -239,21 +177,19 @@ cmd_finish() {
 		fi
 	fi
 
-	if noflag notag; then
-		# try to tag the release
-		# in case a previous attempt to finish this release branch has failed,
-		# but the tag was set successful, we skip it now
-		local tagname=$VERSION_PREFIX$VERSION
-		if ! git_tag_exists "$tagname"; then
-			local opts="-a"
-			flag sign && opts="$opts -s"
-			[ "$FLAGS_signingkey" != "" ] && opts="$opts -u '$FLAGS_signingkey'"
-			[ "$FLAGS_message" != "" ] && opts="$opts -m '$FLAGS_message'"
-			[ "$FLAGS_messagefile" != "" ] && opts="$opts -F '$FLAGS_messagefile'"
-			eval git_do tag $opts "$tagname" "$BRANCH" || \
-			die "Tagging failed. Please run finish again to retry."
-		fi
-	fi
+    # try to tag the release
+    # in case a previous attempt to finish this release branch has failed,
+    # but the tag was set successful, we skip it now
+    local tagname=$VERSION_PREFIX$VERSION
+    if ! git_tag_exists "$tagname"; then
+        local opts="-a"
+        flag sign && opts="$opts -s"
+        [ "$FLAGS_signingkey" != "" ] && opts="$opts -u '$FLAGS_signingkey'"
+        [ "$FLAGS_message" != "" ] && opts="$opts -m '$FLAGS_message'"
+        [ "$FLAGS_messagefile" != "" ] && opts="$opts -F '$FLAGS_messagefile'"
+        eval git_do tag $opts "$tagname" "$BRANCH" || \
+        die "Tagging failed. Please run finish again to retry."
+    fi
 
 	# try to merge into develop
 	# in case a previous attempt to finish this release branch has failed,
@@ -276,23 +212,13 @@ cmd_finish() {
 		fi
 	fi
 
-	# delete branch
-	if noflag keep; then
-		if [ "$BRANCH" = "$(git_current_branch)" ]; then
-			git_do checkout "$MASTER_BRANCH"
-		fi
-		git_do branch -d "$BRANCH"
-	fi
-
 	if flag push; then
 		git_do push "$ORIGIN" "$DEVELOP_BRANCH" || \
 			die "Could not push to $DEVELOP_BRANCH from $ORIGIN."
 		git_do push "$ORIGIN" "$MASTER_BRANCH" || \
 			die "Could not push to $MASTER_BRANCH from $ORIGIN."
-		if noflag notag; then
-			git_do push --tags "$ORIGIN" || \
-			  die "Could not push tags to $ORIGIN."
-		fi
+		git_do push --tags "$ORIGIN" || \
+			die "Could not push tags to $ORIGIN."
 		git_do push "$ORIGIN" :"$BRANCH" || \
 			die "Could not delete the remote $BRANCH in $ORIGIN."
 	fi
@@ -301,15 +227,8 @@ cmd_finish() {
 	echo "Summary of actions:"
 	echo "- Latest objects have been fetched from '$ORIGIN'"
 	echo "- Release branch has been merged into '$MASTER_BRANCH'"
-	if noflag notag; then
-		echo "- The release was tagged '$tagname'"
-	fi
+	echo "- The release was tagged '$tagname'"
 	echo "- Release branch has been back-merged into '$DEVELOP_BRANCH'"
-	if flag keep; then
-		echo "- Release branch '$BRANCH' is still available"
-	else
-		echo "- Release branch '$BRANCH' has been deleted"
-	fi
 	if flag push; then
 		echo "- '$DEVELOP_BRANCH', '$MASTER_BRANCH' and tags have been pushed to '$ORIGIN'"
 		echo "- Release branch '$BRANCH' in '$ORIGIN' has been deleted."
@@ -319,13 +238,11 @@ cmd_finish() {
 
 cmd_publish() {
 	parse_args "$@"
-	require_version_arg
 
 	# sanity checks
 	require_clean_working_tree
 	require_branch "$BRANCH"
 	git_do fetch -q "$ORIGIN"
-	require_branch_absent "$ORIGIN/$BRANCH"
 
 	# create remote branch
 	git_do push "$ORIGIN" "$BRANCH:refs/heads/$BRANCH"
@@ -346,7 +263,6 @@ cmd_publish() {
 
 cmd_track() {
 	parse_args "$@"
-	require_version_arg
 
 	# sanity checks
 	require_clean_working_tree
