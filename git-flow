@@ -112,8 +112,8 @@ main() {
 		exit 1
 	fi
 
-	# run the specified action
-  if [ $SUBACTION != "help" ] && [ $SUBCOMMAND != "version" ]  && [ $SUBCOMMAND != "init" ] ; then
+  # run init on the specified action (if it's a function)
+  if [ `type -t init` == "function" ] ; then
     init
   fi
   cmd_$SUBACTION "$@"
