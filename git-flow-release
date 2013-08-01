@@ -110,7 +110,7 @@ cmd_start() {
 	fi
 
 	# create branch
-	git_do checkout -B "$BRANCH" "$BASE"
+	git_do checkout -bf "$BRANCH" "$BASE"
 
 	echo
 	echo "Summary of actions:"
