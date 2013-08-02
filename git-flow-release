@@ -248,9 +248,7 @@ cmd_publish() {
 	git_do fetch -q "$ORIGIN"
 
 	# create remote branch
-	git_do push "$ORIGIN" "$BRANCH:refs/heads/$BRANCH"
-	git_do push --tags "$ORIGIN" || \
-			die "Could not push tags to $ORIGIN."
+	git_do push --tags "$ORIGIN" "$BRANCH:refs/heads/$BRANCH"
 	git_do fetch -q "$ORIGIN"
 
 	# configure remote tracking
