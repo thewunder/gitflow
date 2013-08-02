@@ -1,3 +1,12 @@
+single-release
+-----
+* Fixes a few bugs with 0.4.2
+
+* Single release branch
+
+* Remove support branch feature
+
+
 0.4.2:
 -----
 Release date: **not yet**

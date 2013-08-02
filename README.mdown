@@ -1,10 +1,17 @@
-git-flow
+git-flow-single-release
 ========
 
 A collection of Git extensions to provide high-level repository operations
 for Vincent Driessen's [branching model](http://nvie.com/git-model "original
 blog post").
 
+This version of the project makes two changes to the nvie model.
+
+* First, instead of creating one release branch per version, one release branch is created and kept for the life of the project.
+Tags on the release branch are used to indicate when a release stabilization phase starts and ends.  The primary motivation for this
+change is for automated deployment.  I don't want to keep having to change which branch is deployed to testing environments.
+
+* Second, the experimental 'support branch' feature is removed
 
 Getting started
 ---------------
@@ -124,25 +131,3 @@ The ``-d`` flag will accept all defaults.
   		git flow hotfix finish <release>
   
   For hotfix branches, the `<base>` arg must be a commit on `master`.
-
-* To list/start support branches, use:
-  
-  		git flow support
-  		git flow support start <release> <base>
-  
-  For support branches, the `<base>` arg must be a commit on `master`.
-
-
-Showing your appreciation
-=========================
-A few people already requested it, so now it's here: a Flattr button.
-
-Of course, the best way to show your appreciation for the original
-[blog post](http://nvie.com/posts/a-successful-git-branching-model/) or the git-flow tool itself remains
-contributing to the community.  If you'd like to show your appreciation in
-another way, however, consider Flattr'ing me:
-
-[![Flattr this][2]][1]
-
-[1]: http://flattr.com/thing/53771/git-flow
-[2]: http://api.flattr.com/button/button-static-50x60.png
