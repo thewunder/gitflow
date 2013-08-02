@@ -258,7 +258,7 @@ cmd_publish() {
 
 	echo
 	echo "Summary of actions:"
-	echo "- A new remote branch '$BRANCH' was created"
+	echo "- Pushed to remote branch '$BRANCH'"
 	echo "- The local branch '$BRANCH' was configured to track the remote branch"
 	echo "- You are now on branch '$BRANCH'"
 	echo
