@@ -189,6 +189,9 @@ cmd_finish() {
     local tagname=$VERSION_PREFIX$VERSION
     if ! git_tag_exists "$tagname"; then
         local opts="-a"
+        if [ "$FLAGS_message" == "" ]; then
+            FLAGS_message="Tagging $tagname"
+        fi
         flag sign && opts="$opts -s"
         [ "$FLAGS_signingkey" != "" ] && opts="$opts -u '$FLAGS_signingkey'"
         [ "$FLAGS_message" != "" ] && opts="$opts -m '$FLAGS_message'"
